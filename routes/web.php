@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
     // Documents
     Route::resource('documents', DocumentController::class)->except(['edit', 'update']);
     Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
+    Route::get('/documents/{document}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::put('/documents/{document}/save', [DocumentController::class, 'save'])->name('documents.save');
     Route::post('/documents/{document}/toggle-public', [DocumentController::class, 'togglePublic'])->name('documents.toggle-public');
 

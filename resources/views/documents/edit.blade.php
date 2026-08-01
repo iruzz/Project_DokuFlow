@@ -63,7 +63,7 @@
                 @csrf
                 @method('PUT')
 
-                <div class="max-w-4xl mx-auto">
+                <div>
                     <div class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
                         <textarea
                             name="content"

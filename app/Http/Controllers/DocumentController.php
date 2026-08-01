@@ -105,6 +105,15 @@ class DocumentController extends Controller
         return view('documents.edit', compact('document'));
     }
 
+    public function preview(Document $document): View
+    {
+        $this->authorize('view', $document);
+
+        $document->load('owner', 'division', 'currentVersion');
+
+        return view('documents.preview', compact('document'));
+    }
+
     public function save(Request $request, Document $document): RedirectResponse
     {
         $this->authorize('update', $document);

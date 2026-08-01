@@ -8,7 +8,6 @@
 
 @layer base {
   :root {
-    color-scheme: light;
     --color-primary: oklch(0.49 0.19 275);
     --color-primary-content: oklch(1 0 0);
     --color-secondary: oklch(0.55 0.04 260);
@@ -34,8 +33,7 @@
     --border: 1px;
   }
 
-  [data-theme="dark"] {
-    color-scheme: dark;
+  .dark {
     --color-base-100: oklch(0.28 0.04 250);
     --color-base-200: oklch(0.2 0.04 260);
     --color-base-300: oklch(0.35 0.04 250);
@@ -57,4 +55,38 @@
 /* Keep placeholder visible */
 .jodit-wysiwyg[contenteditable]:empty:before {
     color: #888 !important;
+}
+
+/* Jodit UI (toolbar, popup, dialog) — paksa teks gelap biar terbaca */
+.jodit-container,
+.jodit-dialog,
+.jodit-popup,
+.jodit-ui,
+.jodit-ui-button,
+.jodit-ui-group,
+.jodit-ui-input,
+.jodit-ui-select,
+.jodit-ui-tree,
+.jodit-ui-tabs {
+    color: #1a1a1a !important;
+}
+.jodit-container input,
+.jodit-container select,
+.jodit-container textarea,
+.jodit-dialog input,
+.jodit-dialog select,
+.jodit-dialog textarea,
+.jodit-ui-input input,
+.jodit-ui-select select {
+    color: #1a1a1a !important;
+    background: #fff !important;
+}
+.jodit-dialog .jodit-ui-label,
+.jodit-ui-label,
+.jodit-ui-tabs__label,
+.jodit-ui-tab,
+.jodit-ui-tree__item,
+.jodit-ui-tree__item a,
+.jodit-ui-button__text {
+    color: #1a1a1a !important;
 }
