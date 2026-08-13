@@ -12,7 +12,6 @@ use App\Http\Controllers\DocumentExportController;
 use App\Http\Controllers\DocumentShareController;
 use App\Http\Controllers\JoditController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\ShareLinkController;
 use App\Http\Controllers\LanguageController;
 use Illuminate\Support\Facades\Route;
 
@@ -69,11 +68,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents/{document}/rollback-request/approve', [ApprovalController::class, 'approveRollback'])->name('approvals.rollback-request.approve');
     Route::post('/documents/{document}/rollback-request/reject', [ApprovalController::class, 'rejectRollback'])->name('approvals.rollback-request.reject');
 
-    // Share Links
-    Route::post('/documents/{document}/links', [ShareLinkController::class, 'store'])->name('links.store');
-    Route::delete('/documents/{document}/links/{link}', [ShareLinkController::class, 'destroy'])->name('links.destroy');
-    Route::get('/my-shared-edits', [ShareLinkController::class, 'history'])->name('shared.history');
-
     // Document Shares (Google Docs model)
     Route::post('/documents/{document}/shares', [DocumentShareController::class, 'store'])->name('shares.store');
     Route::patch('/documents/{document}/shares/{share}', [DocumentShareController::class, 'updateUserShare'])->name('shares.update');
@@ -106,13 +100,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     });
 });
-
-// Shared link access (no auth required)
-Route::get('/share/{token}', [ShareLinkController::class, 'access'])->name('shared.documents');
-Route::post('/share/{token}/save', [ShareLinkController::class, 'save'])->name('shared.documents.save');
-Route::post('/share/{token}/discard', [ShareLinkController::class, 'discard'])->name('shared.documents.discard');
-Route::post('/share/{token}/upload', [ShareLinkController::class, 'upload'])->name('shared.documents.upload');
-Route::post('/share/{token}/export-pdf', [ShareLinkController::class, 'exportPdf'])->name('shared.documents.export-pdf');
 
 // Share-token link access (Google Docs model)
 Route::get('/shared/{token}', [DocumentShareController::class, 'accessByToken'])->name('documents.shared');

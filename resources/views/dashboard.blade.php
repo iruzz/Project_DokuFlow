@@ -122,20 +122,6 @@
                             </div>
                             <div class="stat-desc text-xs text-base-content/40 mt-1">{{ __('Menunggu review kepala') }}</div>
                         </div>
-                        <div class="stat bg-base-100 border border-base-300 rounded-box p-4">
-                            <div class="stat-title text-base-content/50 text-xs font-medium">{{ __('Link Berbagi') }}</div>
-                            <div class="stat-value text-2xl font-bold text-primary mt-1">
-                                {{ \App\Models\DocumentAccessLink::whereHas('document', fn($q) => $q->where('owner_id', auth()->id()))->count() }}
-                            </div>
-                            <div class="stat-desc text-xs text-base-content/40 mt-1">{{ __('Link akses aktif') }}</div>
-                        </div>
-                    </div>
-
-                    <!-- Shared Edit History link -->
-                    <div class="flex flex-wrap justify-end">
-                        <a href="{{ route('shared.history') }}" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            {{ __('Riwayat Edit via Share Link') }} →
-                        </a>
                     </div>
 
                     <!-- Recent Documents -->

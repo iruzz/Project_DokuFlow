@@ -132,14 +132,18 @@ class DocumentShareController extends Controller
         return back()->with('notice', 'Pengaturan akses umum diperbarui.');
     }
 
-    public function regenerateToken(Document $document): RedirectResponse
+    public function regenerateToken(Document $document): JsonResponse
     {
         $this->authorize('manageAccess', $document);
 
         $token = $this->shareService->regenerateShareToken($document);
         $this->auditService->log(auth()->user(), 'share.token.regenerated', 'document', $document->id, []);
 
-        return back()->with('notice', 'Tautan baru dibuat: ' . route('documents.shared', $token));
+        return response()->json([
+            'success' => true,
+            'share_token' => $token,
+            'share_url' => route('documents.shared', $token),
+        ]);
     }
 
     public function shareData(Document $document): JsonResponse

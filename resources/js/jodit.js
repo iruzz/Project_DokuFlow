@@ -104,7 +104,7 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
         '  box-shadow:0 1px 3px rgba(0,0,0,0.1);',
         '}',
         'table { width:100%; border:none; border-collapse:collapse; empty-cells:show; max-width:100%; }',
-        'th, td { padding:2px 5px; border:1px solid #ccc; }',
+        'th, td { padding:2px 5px; border:1px solid #ccc; vertical-align:top !important; }',
         'body, p, div, td, th, li, h1, h2, h3, h4, h5, h6 { overflow-wrap:break-word; word-break:break-word; }',
     ].join('\n');
 }
@@ -148,47 +148,10 @@ function applyPaperSize(editor, size, margin) {
     });
 }
 
-// Ambil HTML editor tanpa elemen spacer pagination (lihat repaginateEditor
-// di bawah) — WAJIB dipakai tiap kali konten mau disimpan/di-preview,
-// supaya jeda visual antar halaman di editor TIDAK ikut kesimpen sebagai
-// bagian dari dokumen asli.
-//
-// FIX ARSITEKTUR PRINT/EXPORT: dulu ada parameter forPrint yang mengubah
-// tiap spacer menjadi forced page-break (break-after:page) TEPAT di posisi
-// yang dihitung repaginateEditor di iframe EDITOR. Itu justru sumber utama
-// "teks amburadul saat margin ditambah" — repaginateEditor mengukur tinggi
-// elemen di iframe editor (yang punya kondisi render/font-loading sendiri),
-// sementara iframe print dibuat baru & fontnya di-fetch ulang secara
-// terpisah. Begitu margin besar (ruang tulis per halaman makin sempit),
-// selisih pengukuran sekecil apa pun antara dua iframe itu sudah cukup
-// membuat titik potong yang "dipaksakan" dari editor meleset dari tinggi
-// konten yang SEBENARNYA di iframe print — hasilnya 1 kalimat nyangkut di
-// atas/bawah dan sisa halaman kosong.
-//
-// Sekarang getCleanValue HANYA membuang spacer (untuk disimpan/preview).
-// Untuk cetak, TIDAK ADA LAGI titik potong yang dipaksakan dari editor —
-// browser sendiri yang menghitung page-break native saat print, karena
-// dialah satu-satunya pihak yang benar-benar tahu tinggi final tiap elemen
-// setelah font & layout di iframe print settle. Lihat doPrint() +
-// aturan `break-inside: avoid` di CSS print untuk cara barunya.
-// FIX AKAR MASALAH "ada spasi kosong gede sebelum list, list kepental utuh
-// ke halaman berikutnya": versi sebelumnya menganggap <ol>/<ul> sebagai SATU
-// elemen utuh yang "tidak boleh dipecah" — persis sama seperti paragraf atau
-// gambar. Begitu daftar bernomor (mis. 5 item) tidak muat lagi di sisa
-// halaman, SELURUH list didorong ke halaman berikutnya sebagai satu blok,
-// walau baru item ke-3 dst yang sebenarnya kepotong. Sisa ruang di halaman
-// sebelumnya (yang sebenarnya masih cukup buat item 1-2) jadi terbuang jadi
-// spasi kosong besar — itu yang muncul di screenshot: paragraf penutup di
-// atas, lalu blank sampai ke penanda halaman, baru listnya nongol utuh di
-// halaman berikutnya.
-//
-// FIX: list sekarang diperlakukan seperti di Word/Google Docs — boleh
-// terpotong ANTAR item (satu <li> boleh pindah halaman), tapi SATU <li>
-// sendiri tetap tidak boleh terpotong di tengah kalimat. Saat titik potong
-// jatuh di tengah sebuah <li>, list dipecah jadi DUA elemen <ol>/<ul>: satu
-// berisi item-item yang muat di halaman sekarang, satu lagi (mulai dari item
-// yang kepotong) diteruskan ke halaman berikutnya — dengan atribut `start`
-// di-set supaya nomor urutnya TETAP NYAMBUNG (bukan reset ke 1).
+// Bangun elemen spacer visual antar "halaman" di editor/preview.
+// CATATAN: spacer di sini MURNI VISUAL/PERKIRAAN, tidak menentukan titik
+// potong halaman saat cetak — itu diserahkan ke native pagination browser
+// (lihat doPrint() + buildPrintStyle()).
 function buildSpacerElement(margin, gap, extraAttrs) {
     const spacer = document.createElement('div');
     spacer.setAttribute('data-page-spacer', 'true');
@@ -415,15 +378,50 @@ function paginateContainer(container, contentPerPage, gap, margin) {
     }
 }
 
-// getCleanValue: WAJIB gabungkan lagi list yang sempat dipecah paginateList
-// SEBELUM membuang spacer — supaya HTML yang disimpan/di-print tetap SATU
-// <ol>/<ul> utuh seperti aslinya, bukan dua elemen list terpisah hasil
-// pecahan visual editor.
-function getCleanValue(editor) {
+// Ambil HTML editor tanpa elemen spacer pagination — WAJIB dipakai tiap kali
+// konten mau disimpan/di-preview, supaya jeda visual antar halaman di editor
+// TIDAK ikut kesimpen sebagai bagian dari dokumen asli.
+//
+// forPrint (opsional, default false): HANYA dipakai oleh doPrint() untuk
+// mengganti placeholder QR ("[QR CODE DOKUMEN 120px]") jadi <img> QR asli
+// yang di-fetch dari server (lihat data-qr-image-url di textarea), supaya
+// QR beneran ke-print & bisa discan. Saat forPrint=false (disimpan ke DB /
+// draft localStorage), placeholder TETAP teks biasa — QR baru "hidup" saat
+// konten ditampilkan lewat halaman show/preview (server-side, lihat
+// QrCodeService::injectPlaceholder) atau saat print via jalur ini sendiri,
+// bukan disimpan sebagai gambar beku.
+//
+// PENTING: forPrint TIDAK mengubah pagination sama sekali — arsitektur
+// print/export TIDAK LAGI memaksakan titik potong dari spacer editor (lihat
+// catatan di buildPrintStyle()); ini murni penggantian placeholder QR.
+function getCleanValue(editor, forPrint = false) {
     const raw = editor.value;
     const doc = new DOMParser().parseFromString(raw, 'text/html');
     mergeSplitLists(doc.body);
     doc.querySelectorAll('[data-page-spacer]').forEach((el) => el.remove());
+
+    if (forPrint) {
+        const qrImageUrl = editor.element?.dataset?.qrImageUrl;
+        if (qrImageUrl) {
+            // Ukuran QR di-baca dari TEKS placeholder ("[QR CODE DOKUMEN
+            // 150px]"), BUKAN dari atribut data-qr-size — Jodit membuang
+            // semua atribut data-* saat clean-html/save, jadi atribut tidak
+            // bisa diandalkan untuk menyimpan ukuran. Teks tidak pernah kena
+            // strip, jadi ukuran dijamin selalu ikut walau atribut
+            // data-qr-placeholder sendiri ikut hilang.
+            doc.querySelectorAll('[data-qr-placeholder], span[style*="dashed"]').forEach((el) => {
+                const match = el.textContent.match(/\[QR CODE DOKUMEN\s*(\d+)px\]/i);
+                if (!match) return;
+                const size = Math.max(40, Math.min(400, parseInt(match[1], 10) || 120));
+                const img = doc.createElement('img');
+                img.src = qrImageUrl;
+                img.alt = 'QR Code Dokumen';
+                img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;`;
+                el.replaceWith(img);
+            });
+        }
+    }
+
     return doc.body.innerHTML;
 }
 
@@ -591,10 +589,10 @@ function initPreviewPagination(scopeSelector = '.doku-paper-scope') {
 // dan menerima nilai dalam cm: 1cm = 96/2.54 px.
 const PX_PER_CM = 96 / 2.54;
 
-// Dipanggil dari tombol toolbar "margin" — lihat controls.margin di bawah.
 // Popup tombol "Sisip QR Code": pilih ukuran QR (px) lalu insert placeholder
 // ke posisi kursor. Ukuran dipakai sebagai width/height <img> saat render
-// final (server: QrCodeService::injectPlaceholder; print: getCleanValue).
+// final (server: QrCodeService::injectPlaceholder; print: getCleanValue
+// dengan forPrint=true).
 function buildQrPopup(editor, close) {
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'padding:12px; display:flex; flex-direction:column; gap:8px; min-width:220px; background:#fff;';
@@ -631,7 +629,7 @@ function buildQrPopup(editor, close) {
 
         // FIX: ukuran di-encode LANGSUNG di teks placeholder (bukan atribut
         // data-qr-size) — Jodit membuang semua atribut data-* saat clean-html
-        // saat save (lihat catatan di getCleanValue di bawah), jadi kalau
+        // saat save (lihat catatan di getCleanValue di atas), jadi kalau
         // ukuran disimpan sebagai atribut, nilainya selalu hilang & fallback
         // ke default. Teks konten tidak pernah kena strip, jadi aman.
         editor.s.insertHTML(
@@ -737,6 +735,8 @@ function buildMarginPopup(editor, close) {
     return wrapper;
 }
 
+// Popup tombol "Sisipkan Tanda Tangan (TTD)": cari & pilih user, lalu insert
+// placeholder TTD ke posisi kursor.
 function buildSignaturePopup(editor, close) {
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'padding:12px; display:flex; flex-direction:column; gap:8px; min-width:240px; max-width:320px; background:#fff;';
@@ -746,6 +746,17 @@ function buildSignaturePopup(editor, close) {
     title.style.cssText = 'font-weight:600; margin-bottom:4px; color:#1a1a1a; font-size:14px;';
     wrapper.appendChild(title);
 
+    // --- Search input ---
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Cari nama atau divisi...';
+    searchInput.style.cssText = 'width:100%; padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; color:#1f2937; outline:none; box-sizing:border-box; transition:border-color 0.15s;';
+    searchInput.addEventListener('focus', () => { searchInput.style.borderColor = '#6366f1'; });
+    searchInput.addEventListener('blur', () => { searchInput.style.borderColor = '#d1d5db'; });
+    // Hide search until data is loaded
+    searchInput.style.display = 'none';
+    wrapper.appendChild(searchInput);
+
     const loading = document.createElement('div');
     loading.textContent = 'Memuat daftar pengguna...';
     loading.style.cssText = 'font-size:12px; color:#6b7280; padding:8px 0;';
@@ -754,6 +765,12 @@ function buildSignaturePopup(editor, close) {
     const listContainer = document.createElement('div');
     listContainer.style.cssText = 'display:none; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; margin-top:4px; border:1px solid #e5e7eb; border-radius:6px; padding:4px;';
     wrapper.appendChild(listContainer);
+
+    // --- Empty state message (hidden by default) ---
+    const emptyState = document.createElement('div');
+    emptyState.textContent = 'Tidak ada tanda tangan ditemukan';
+    emptyState.style.cssText = 'display:none; font-size:12px; color:#9ca3af; text-align:center; padding:12px 0;';
+    wrapper.appendChild(emptyState);
 
     fetch('/signatures/users', {
         headers: { 'Accept': 'application/json' }
@@ -802,6 +819,73 @@ function buildSignaturePopup(editor, close) {
         .catch(err => {
             loading.textContent = 'Gagal memuat daftar pengguna.';
             loading.style.color = '#ef4444';
+    .then(res => res.json())
+    .then(data => {
+        loading.style.display = 'none';
+        listContainer.style.display = 'flex';
+        searchInput.style.display = '';
+        const users = data.users || [];
+
+        // Keep references to each button and its searchable text
+        const entries = [];
+
+        users.forEach(u => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
+            btn.onmouseover = () => btn.style.background = '#f3f4f6';
+            btn.onmouseout = () => btn.style.background = 'transparent';
+
+            const left = document.createElement('div');
+            left.style.cssText = 'display:flex; flex-direction:column;';
+            const name = document.createElement('span');
+            name.style.cssText = 'font-weight:500;';
+            const displayName = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
+            name.textContent = displayName;
+
+            const role = document.createElement('span');
+            role.style.cssText = 'font-size:11px; color:#6b7280;';
+            const roleText = `${u.role} - ${u.division}`;
+            role.textContent = roleText;
+
+            left.appendChild(name);
+            left.appendChild(role);
+
+            const badge = document.createElement('span');
+            badge.style.cssText = 'font-size:11px; font-family:monospace; background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:600;';
+            badge.textContent = u.placeholder;
+
+            btn.appendChild(left);
+            btn.appendChild(badge);
+
+            btn.addEventListener('click', () => {
+                editor.selection.insertHTML(` ${u.placeholder} `);
+                if (typeof close === 'function') close();
+            });
+
+            listContainer.appendChild(btn);
+
+            // Store searchable text (lowercase) alongside the button element
+            entries.push({
+                el: btn,
+                searchText: `${displayName} ${roleText} ${u.placeholder}`.toLowerCase()
+            });
+        });
+
+        // --- Wire up search/filter ---
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toLowerCase();
+            let visibleCount = 0;
+
+            entries.forEach(entry => {
+                const matches = !query || entry.searchText.includes(query);
+                entry.el.style.display = matches ? '' : 'none';
+                if (matches) visibleCount++;
+            });
+
+            // Show/hide empty state
+            emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+            listContainer.style.display = visibleCount === 0 ? 'none' : 'flex';
         });
 
     return wrapper;
@@ -941,22 +1025,10 @@ function buildPrintStyle(win, size, margin) {
                muat ke halaman baru secara penuh, bukan menyisakan sepotong
                kalimat nyangkut.
 
-               FIX AKAR MASALAH "spasi kosong besar sebelum list, list
-               kepental utuh ke halaman berikutnya": aturan ini SENGAJA TIDAK
-               menyasar <ol>/<ul> itu sendiri (beda dari versi sebelumnya
-               yang pakai selector generik "body > *" — itu ikut mengunci
-               SELURUH list jadi satu blok tak terpisahkan). Kalau seluruh
-               list dikunci begitu, browser terpaksa mendorong SEMUA
-               itemnya ke halaman berikutnya begitu item manapun tidak muat,
-               walau baru item ke-3/4/5 yang sebenarnya kepotong — sisa
-               ruang di halaman sebelumnya (yang masih cukup buat item
-               1-2) jadi kebuang jadi spasi kosong besar.
-
-               Sekarang: <ol>/<ul> DIBIARKAN boleh terpotong ANTAR <li> oleh
-               browser (persis seperti list di Word/Google Docs), sementara
-               tiap <li> individual tetap dikunci "break-inside: avoid"
-               supaya isi satu item tidak pernah terpotong di tengah
-               kalimat. */
+               <ol>/<ul> DIBIARKAN boleh terpotong ANTAR <li> oleh browser
+               (persis seperti list di Word/Google Docs), sementara tiap
+               <li> individual tetap dikunci "break-inside: avoid" supaya
+               isi satu item tidak pernah terpotong di tengah kalimat. */
             body > p,
             body > h1, body > h2, body > h3, body > h4, body > h5, body > h6,
             body > table, body > blockquote, body > figure, body > pre {
@@ -972,7 +1044,8 @@ function buildPrintStyle(win, size, margin) {
     win.document.head.appendChild(style);
 }
 
-// Inti logika cetak: bangun iframe, isi konten bersih (tanpa spacer),
+// Inti logika cetak: bangun iframe, isi konten bersih (tanpa spacer, dengan
+// QR placeholder sudah diganti jadi <img> lewat getCleanValue(jodit, true)),
 // set @page { size + margin } sesuai argumen, tunggu font & gambar load,
 // lalu panggil print — pagination dihitung native oleh browser.
 function doPrint(jodit, size) {
@@ -1000,9 +1073,10 @@ function doPrint(jodit, size) {
         .on(jodit.ow, 'mousemove', afterFinishPrint);
 
     jodit.e.fire('generateDocumentStructure.iframe', myWindow.document, jodit);
-    // getCleanValue TANPA forPrint: cuma buang spacer, tidak ada titik
-    // potong yang dipaksakan — browser yang menghitung sendiri.
-    myWindow.document.body.innerHTML = getCleanValue(jodit);
+    // getCleanValue(jodit, true): buang spacer DAN ganti placeholder QR jadi
+    // <img> asli. Tidak ada titik potong halaman yang dipaksakan — browser
+    // yang menghitung sendiri.
+    myWindow.document.body.innerHTML = getCleanValue(jodit, true);
 
     const margin = jodit.currentMargin || DEFAULT_MARGIN;
     buildPrintStyle(myWindow, size, margin);
@@ -1093,13 +1167,6 @@ export function initJoditEditor(selector, overrides = {}) {
         ],
 
         controls: {
-            signature: {
-                name: 'signature',
-                tooltip: 'Sisipkan Tanda Tangan (TTD)',
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 19h6"/><path d="M19 16v6"/><path d="M12 4a4 4 0 0 1 4 4c0 4-5 6-5 6s-5-2-5-6a4 4 0 0 1 4-4z"/><path d="M17.8 13.9 14 21.5 10 18l-2 3.5"/></svg>',
-                popup: (editor, _current, _self, close) => buildSignaturePopup(editor, close),
-            },
-
             // Daftar font custom (Google Fonts) yang muncul di dropdown toolbar "font"
             font: {
                 list: Jodit.atom(FONT_LIST),
@@ -1135,13 +1202,22 @@ export function initJoditEditor(selector, overrides = {}) {
             // Placeholder diganti jadi <img> QR asli HANYA saat render final:
             // - server-side: QrCodeService::injectPlaceholder() (show/preview/
             //   preview-version/PDF export)
-            // - client-side: getCleanValue({forPrint:true}) di bawah, dipakai tombol
-            //   "print" di toolbar ini sendiri.
+            // - client-side: getCleanValue(jodit, true), dipakai tombol
+            //   "print" di toolbar ini sendiri (lihat doPrint()).
             qrCode: {
                 name: 'qrCode',
                 tooltip: 'Sisip QR Code Dokumen',
                 icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM14 20h3M20 14v3M20 20h.01"/></svg>',
                 popup: (editor, _current, _self, close) => buildQrPopup(editor, close),
+            },
+
+            // Tombol "Sisipkan Tanda Tangan (TTD)": buka popup cari/pilih
+            // pengguna, lalu insert placeholder TTD ke posisi kursor.
+            signature: {
+                name: 'signature',
+                tooltip: 'Sisipkan Tanda Tangan (TTD)',
+                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 19h6"/><path d="M19 16v6"/><path d="M12 4a4 4 0 0 1 4 4c0 4-5 6-5 6s-5-2-5-6a4 4 0 0 1 4-4z"/><path d="M17.8 13.9 14 21.5 10 18l-2 3.5"/></svg>',
+                popup: (editor, _current, _self, close) => buildSignaturePopup(editor, close),
             },
 
             image: {
@@ -1259,12 +1335,12 @@ export function initJoditEditor(selector, overrides = {}) {
                 },
             },
 
-            // Override tombol "print" bawaan Jodit. Sekarang tinggal delegasi
-            // ke doPrint() (fungsi yang sama dipakai buildPrintPopup) —
-            // logika print SUDAH DISATUKAN jadi satu tempat, tidak ada lagi
-            // duplikasi kode antara tombol toolbar & popup pilih ukuran.
-            // Pagination dihitung native oleh browser (lihat buildPrintStyle),
-            // bukan lagi dipaksakan dari spacer editor.
+            // Override tombol "print" bawaan Jodit. Delegasi ke doPrint()
+            // (fungsi yang sama dipakai buildPrintPopup) — logika print
+            // SUDAH DISATUKAN jadi satu tempat, tidak ada lagi duplikasi
+            // kode antara tombol toolbar & popup pilih ukuran. Pagination
+            // dihitung native oleh browser (lihat buildPrintStyle), bukan
+            // lagi dipaksakan dari spacer editor.
             print: {
                 name: 'print',
                 tooltip: 'Print',
@@ -1307,6 +1383,8 @@ export function initJoditEditor(selector, overrides = {}) {
     if (form) form.addEventListener('submit', () => {
         // getCleanValue: WAJIB — tanpa ini elemen jeda pagination ikut
         // tersimpan ke database sebagai bagian dari konten dokumen.
+        // forPrint TIDAK dipakai di sini — placeholder QR tetap teks biasa
+        // saat disimpan ke DB.
         ta.value = getCleanValue(editor);
 
         const sizeInput = form.querySelector('[name="paper_size"]');
@@ -1412,6 +1490,7 @@ export function initJoditEditor(selector, overrides = {}) {
 
     editor.events.on('change', () => scheduleRepaginate(editor));
 
+    // Shortcut Ctrl+Z (undo) / Ctrl+Shift+Z / Ctrl+Y (redo).
     editor.events.on('keydown', (e) => {
         if (e.ctrlKey || e.metaKey) {
             const key = e.key.toLowerCase();

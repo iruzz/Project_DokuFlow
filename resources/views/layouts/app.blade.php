@@ -144,6 +144,72 @@
 
                 <!-- Page Content -->
                 <main class="flex-1 min-h-0 p-3 sm:p-6 overflow-y-auto">
+                <main class="flex-1 p-3 sm:p-6 overflow-y-auto">
+                    @php
+                        $crumbs = [];
+                        $route = request()->route();
+                        $name = $route ? $route->getName() : null;
+                        $user = auth()->user();
+                        $isAdmin = $user->isAdmin();
+                        $isHead = $user->isHead();
+
+                        $docType = request('type', 'general');
+                        if ($route && in_array($name, ['documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
+                            $docType = match (request()->route('document')?->visibility) {
+                                'personal' => 'mine',
+                                'division' => 'division',
+                                default => 'general',
+                            };
+                        }
+                        $docTypeLabel = match ($docType) {
+                            'mine' => __('Dokumen Saya'),
+                            'division' => __('Dokumen Divisi'),
+                            default => __('Dokumen Umum'),
+                        };
+                        $docTypeRoute = route('documents.index', ['type' => $docType]);
+
+                        if ($route) {
+                            if (str_starts_with($name, 'documents.')) {
+                                if (in_array($name, ['documents.create', 'documents.edit', 'documents.show', 'documents.preview', 'documents.preview-version'])) {
+                                    $crumbs[] = ['label' => $docTypeLabel, 'url' => $docTypeRoute];
+                                }
+                                $crumbs[] = ['label' => match ($name) {
+                                    'documents.create' => __('Buat'),
+                                    'documents.edit' => __('Edit'),
+                                    'documents.show' => __('Detail Dokumen'),
+                                    'documents.preview' => __('Pratinjau'),
+                                    'documents.preview-version' => __('Pratinjau'),
+                                    default => $docTypeLabel,
+                                }, 'url' => null];
+                            } elseif ($name !== 'dashboard') {
+                                $crumbs[] = ['label' => __('Dashboard'), 'url' => route('dashboard')];
+                                if (str_starts_with($name, 'admin.')) {
+                                    $section = match (true) {
+                                        str_contains($name, 'divisions') => __('Divisi'),
+                                        str_contains($name, 'document-types') => __('Tipe Dokumen'),
+                                        str_contains($name, 'users') => __('Pengguna'),
+                                        str_contains($name, 'retention') => __('Retensi'),
+                                        default => __('Administrasi'),
+                                    };
+                                    $crumbs[] = ['label' => $section, 'url' => null];
+                                    if (str_contains($name, '.create')) {
+                                        $crumbs[] = ['label' => __('Buat'), 'url' => null];
+                                    } elseif (str_contains($name, '.edit')) {
+                                        $crumbs[] = ['label' => __('Edit'), 'url' => null];
+                                    }
+                                } elseif ($name === 'approvals.index') {
+                                    $crumbs[] = ['label' => __('Persetujuan'), 'url' => null];
+                                } elseif ($name === 'profile.edit') {
+                                    $crumbs[] = ['label' => __('Profil'), 'url' => null];
+                                }
+                            }
+                        }
+                    @endphp
+
+                    @if(count($crumbs) > 0)
+                        <x-breadcrumbs :items="$crumbs" />
+                    @endif
+
                     {{ $slot }}
                 </main>
             </div>

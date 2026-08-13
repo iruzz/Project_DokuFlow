@@ -75,49 +75,19 @@
                         </div>
                         @can('approve', $document)
                             <div class="flex flex-wrap gap-2 shrink-0">
-<<<<<<< HEAD
-                             <div class="flex flex-wrap gap-2 shrink-0">
-    <button
-        type="button"
-        class="btn btn-success btn-sm"
-        x-on:click="$dispatch('open-modal', 'confirm-approve-rollback')"
-    >
-        <svg xmlns="http://www.w3.org/2000/svg"
-             class="w-4 h-4"
-             fill="none"
-             viewBox="0 0 24 24"
-             stroke="currentColor">
-            <path stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M5 13l4 4L19 7" />
-        </svg>
-        {{ __('Approve') }} Rollback
-    </button>
-
-    <form
-        method="POST"
-        action="{{ route('approvals.rollback-request.reject', $document) }}"
-        class="inline"
-    >
-        @csrf
-
-        <button type="submit" class="btn btn-outline btn-error btn-sm">
-            <svg xmlns="http://www.w3.org/2000/svg"
-                 class="w-4 h-4"
-                 fill="none"
-                 viewBox="0 0 24 24"
-                 stroke="currentColor">
-                <path stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            {{ __('Reject') }}
-        </button>
-    </form>
-</div>
->>>>>>> 2-bahasa
+                                <form method="POST" action="{{ route('approvals.rollback-request.approve', $document) }}" class="inline">
+                                    @csrf
+                                    <button class="btn btn-success btn-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                        {{ __('Approve') }} Rollback
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('approvals.rollback-request.reject', $document) }}" class="inline">
+                                    @csrf
+                                    <button class="btn btn-outline btn-error btn-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        {{ __('Reject') }}
+                                    </button>
                                 </form>
                             </div>
                         @endcan
@@ -244,9 +214,6 @@
                             @endif
                         @endcan
                         @can('update', $document)
-                            <button type="button" onclick="document.getElementById('link-form').showModal()" class="btn btn-outline btn-primary btn-sm">
-                                {{ __('Link Berbagi') }}
-                            </button>
                         @endcan
                         @can('manageAccess', $document)
                             <button type="button" onclick="openShareModal()" class="btn btn-outline btn-primary btn-sm">
@@ -398,91 +365,6 @@
                     <span>{{ $errors->first('export') }} Silakan coba lagi.</span>
                 </div>
             @endif
-            <!-- Share Link Modal -->
-            <dialog id="link-form" class="modal">
-                <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
-                    <div class="flex flex-wrap items-center justify-between mb-4">
-                        <h3 class="font-semibold">Generate Share Link</h3>
-                        <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('link-form').close()">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    @if(session('notice'))
-                        <div class="alert alert-warning mb-4">
-                            <span>{{ session('notice') }}</span>
-                        </div>
-                    @endif
-
-                    @php
-                        $activeLinks = $document->accessLinks->filter(fn($l) => !$l->isExpired());
-                        $activeRole = fn($r) => $activeLinks->firstWhere('role', $r);
-                    @endphp
-
-                    <form method="POST" action="{{ route('links.store', $document) }}" class="flex flex-col sm:flex-row gap-3 sm:gap-2 sm:items-end">
-                        @csrf
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Role</span></label>
-                            <select name="role" class="select select-bordered w-full" required>
-                                <option value="viewer" @disabled($activeRole('viewer'))>Viewer {{ $activeRole('viewer') ? '(active)' : '' }}</option>
-                                <option value="editor" @disabled($activeRole('editor'))>Editor {{ $activeRole('editor') ? '(active)' : '' }}</option>
-                            </select>
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Expires (optional)</span></label>
-                            <input type="date" name="expires_at" class="input input-bordered w-full" min="{{ date('Y-m-d', strtotime('+1 day')) }}">
-                        </div>
-                        <button type="submit" class="btn btn-primary">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                            Generate
-                        </button>
-                    </form>
-
-                    @if($activeRole('viewer') || $activeRole('editor'))
-                        <p class="mt-3 text-xs text-base-content/50">
-                            Hanya satu link aktif per role. Role dengan link aktif tidak bisa digenerate lagi sampai link-nya dicabut (Revoke) atau kedaluwarsa.
-                        </p>
-                    @endif
-
-                    @if($document->accessLinks->count())
-                        <div class="mt-4">
-                            <h4 class="text-sm font-medium text-base-content/70 mb-2">Active Links</h4>
-                            @foreach($document->accessLinks as $link)
-                                <div class="flex flex-wrap justify-between items-center gap-2 py-2 border-b border-base-200 text-sm">
-                                    <button type="button"
-                                            class="text-base-content/60 break-all max-w-full min-w-0 text-left hover:underline"
-                                            onclick="openShareLinkModal('{{ route('shared.documents', $link->token) }}')"
-                                            title="Klik untuk salin link">
-                                        {{ route('shared.documents', $link->token) }}
-                                    </button>
-                                    <div class="flex flex-wrap gap-2 items-center shrink-0">
-                                        <span class="badge {{ $link->role === 'editor' ? 'badge-primary' : 'badge-ghost' }} badge-sm">
-                                            {{ $link->role }}
-                                        </span>
-                                        @if($link->expires_at)
-                                            <span class="text-xs text-base-content/50">until {{ $link->expires_at->format('Y-m-d') }}</span>
-                                        @else
-                                            <span class="text-xs text-base-content/50">never</span>
-                                        @endif
-                                        <form method="POST" action="{{ route('links.destroy', [$document, $link]) }}" class="inline">
-                                            @csrf @method('DELETE')
-                                            <button class="text-error hover:underline text-xs inline-flex items-center gap-1">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                Revoke
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
-                <form method="dialog" class="modal-backdrop">
-                    <button>close</button>
-                </form>
-            </dialog>
 
             {{-- Bagikan Modal (Google Docs model) --}}
             <dialog id="share-modal" class="modal">
@@ -525,12 +407,25 @@
                                 <span class="text-sm">Siapa saja yang punya link</span>
                             </label>
                             <div class="flex flex-wrap items-center gap-2 mt-2">
-                                <button type="button" class="btn btn-outline btn-primary btn-sm" onclick="copyShareUrl()">
+                                <button type="button" class="btn btn-outline btn-primary btn-sm" onclick="copyShareUrl(this)">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                                     Salin Link
                                 </button>
-                                <button type="button" class="btn btn-ghost btn-sm" onclick="regenerateToken()">Buat link baru</button>
+                                <button type="button" id="regenerate-token-btn" class="btn btn-ghost btn-sm" onclick="regenerateToken(this)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                    Buat link baru
+                                </button>
                             </div>
+                            {{-- Feedback: link disalin --}}
+                            <div id="share-copied-feedback" class="hidden mt-3 p-3 bg-success/10 border border-success/20 rounded-lg transition-all">
+                                <p class="text-xs font-semibold text-success flex items-center gap-1.5 mb-1.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                    Link berhasil disalin
+                                </p>
+                                <input id="share-copied-url" type="text" class="input input-bordered input-sm w-full text-xs bg-base-100" readonly onclick="this.select()" />
+                            </div>
+                            {{-- Feedback: link baru dibuat --}}
+                            <div id="share-regenerated-feedback" class="hidden mt-3 p-3 rounded-lg transition-all"></div>
                         </div>
                     </div>
                 </div>
@@ -747,64 +642,7 @@
     <style>
         #share-link-modal::backdrop { background: rgba(0, 0, 0, 0.5); }
     </style>
-    <dialog id="share-link-modal" class="modal">
-        <div class="modal-box max-w-md max-h-[85vh] overflow-y-auto">
-            <div class="flex flex-wrap items-center justify-between mb-4">
-                <h3 class="font-semibold">Link Berhasil Dibuat</h3>
-                <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="document.getElementById('share-link-modal').close()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            <input id="share-link-input" type="text" readonly
-                   class="input input-bordered w-full mb-4" onclick="this.select()">
-
-            <div class="flex flex-wrap gap-2">
-                <button type="button" id="share-link-copy-btn" class="btn btn-primary btn-sm" onclick="shareLinkCopy()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    Copy Link
-                </button>
-                <a id="share-link-email" href="mailto:?subject={{ rawurlencode('Link Dokumen: ' . $document->title) }}&body="
-                   class="btn btn-neutral btn-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                    Share Email
-                </a>
-                <a id="share-link-wa" href="https://wa.me/?text=" target="_blank" rel="noopener"
-                   class="btn btn-success btn-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                    Share WhatsApp
-                </a>
-            </div>
-        </div>
-        <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-        </form>
-    </dialog>
-
     <script>
-        function openShareLinkModal(url) {
-            document.getElementById('share-link-input').value = url;
-            document.getElementById('share-link-email').href = 'mailto:?subject=' + encodeURIComponent('Link Dokumen: {{ $document->title }}') + '&body=' + encodeURIComponent(url);
-            document.getElementById('share-link-wa').href = 'https://wa.me/?text=' + encodeURIComponent(url);
-            document.getElementById('share-link-modal').showModal();
-        }
-
-        @if(session('share_link'))
-            openShareLinkModal('{{ session('share_link') }}');
-        @endif
-
-        function shareLinkCopy() {
-            const input = document.getElementById('share-link-input');
-            const btn = document.getElementById('share-link-copy-btn');
-            navigator.clipboard.writeText(input.value).then(() => {
-                const original = btn.textContent;
-                btn.textContent = 'Copied!';
-                setTimeout(() => { btn.textContent = original; }, 2000);
-            });
-        }
-
         @if($errors->has('file'))
             document.getElementById('upload-version-modal').showModal();
         @endif
@@ -939,14 +777,107 @@
             await loadShareData();
         }
 
-        async function regenerateToken() {
-            await postForm(shareRegenUrl, {});
-            await loadShareData();
+        async function regenerateToken(btn) {
+            if (!btn) btn = document.getElementById('regenerate-token-btn');
+            const feedbackDiv = document.getElementById('share-regenerated-feedback');
+
+            // Save original button content and show loading state
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Memproses…';
+            feedbackDiv.classList.add('hidden');
+
+            try {
+                const res = await fetch(shareRegenUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                    },
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.message || 'Gagal membuat link baru.');
+                }
+
+                const data = await res.json();
+
+                // Update the frontend state immediately so "Salin Link" copies the new URL
+                if (shareState) {
+                    shareState.share_token = data.share_token;
+                    shareState.share_url = data.share_url;
+                }
+
+                // Show success feedback
+                feedbackDiv.className = 'mt-3 p-3 bg-success/10 border border-success/20 rounded-lg transition-all';
+                feedbackDiv.innerHTML = `
+                    <p class="text-xs font-semibold text-success flex items-center gap-1.5 mb-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                        Link baru berhasil dibuat
+                    </p>
+                    <input type="text" class="input input-bordered input-sm w-full text-xs bg-base-100" readonly value="${escapeHtml(data.share_url)}" onclick="this.select()" />
+                `;
+                feedbackDiv.classList.remove('hidden');
+
+                // Auto-hide after 5 seconds
+                setTimeout(() => { feedbackDiv.classList.add('hidden'); }, 5000);
+
+                // Also refresh the full share data to stay in sync
+                await loadShareData();
+            } catch (err) {
+                // Show error feedback
+                feedbackDiv.className = 'mt-3 p-3 bg-error/10 border border-error/20 rounded-lg transition-all';
+                feedbackDiv.innerHTML = `
+                    <p class="text-xs font-semibold text-error flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        ${escapeHtml(err.message)}
+                    </p>
+                `;
+                feedbackDiv.classList.remove('hidden');
+                setTimeout(() => { feedbackDiv.classList.add('hidden'); }, 5000);
+            } finally {
+                // Restore button
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
 
-        function copyShareUrl() {
+        function copyShareUrl(btn) {
             if (!shareState?.share_url) return;
-            navigator.clipboard.writeText(shareState.share_url);
+
+            const fallbackCopy = () => {
+                prompt("Gagal menyalin otomatis. Silakan salin link berikut secara manual:", shareState.share_url);
+            };
+
+            const showFeedback = () => {
+                const feedbackDiv = document.getElementById('share-copied-feedback');
+                const inputUrl = document.getElementById('share-copied-url');
+                
+                inputUrl.value = shareState.share_url;
+                feedbackDiv.classList.remove('hidden');
+                
+                // Ubah state tombol
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg> Tersalin`;
+                btn.classList.add('btn-success', 'text-success-content');
+                btn.classList.remove('btn-outline', 'btn-primary');
+
+                setTimeout(() => {
+                    feedbackDiv.classList.add('hidden');
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('btn-success', 'text-success-content');
+                    btn.classList.add('btn-outline', 'btn-primary');
+                }, 3000);
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(shareState.share_url)
+                    .then(showFeedback)
+                    .catch(fallbackCopy);
+            } else {
+                fallbackCopy();
+            }
         }
 
         // Invite autocomplete
