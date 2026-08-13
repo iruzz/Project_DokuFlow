@@ -165,6 +165,47 @@ function buildSpacerElement(margin, gap, extraAttrs) {
         userSelect: 'none',
     });
 
+    // FIX QR (print): saat forPrint, ganti placeholder QR (lihat control
+    // "qrCode" di atas) jadi <img> QR asli yang di-fetch dari server
+    // (route documents.qrcode, lihat data-qr-image-url di textarea) —
+    // supaya QR beneran ke-print & bisa di-scan. Saat forPrint=false
+    // (disimpan ke DB / draft localStorage), placeholder TETAP teks biasa
+    // — QR baru "hidup" saat konten ditampilkan lewat halaman show/preview
+    // (lihat QrCodeService::injectPlaceholder di server) atau saat print
+    // ini sendiri, bukan disimpan sebagai gambar beku.
+    if (forPrint) {
+        const qrImageUrl = editor.element?.dataset?.qrImageUrl;
+        if (qrImageUrl) {
+            // Ukuran QR di-baca dari TEKS placeholder ("[QR CODE DOKUMEN
+            // 150px]"), BUKAN dari atribut data-qr-size — Jodit membuang
+            // semua atribut data-* saat clean-html/save, jadi atribut tidak
+            // bisa diandalkan untuk menyimpan ukuran. Teks tidak pernah kena
+            // strip, jadi ukuran dijamin selalu ikut walau atribut
+            // data-qr-placeholder sendiri ikut hilang.
+            doc.querySelectorAll('[data-qr-placeholder], span[style*="dashed"]').forEach((el) => {
+                const match = el.textContent.match(/\[QR CODE DOKUMEN\s*(\d+)px\]/i);
+                if (!match) return;
+                const size = Math.max(40, Math.min(400, parseInt(match[1], 10) || 120));
+                const img = doc.createElement('img');
+                img.src = qrImageUrl;
+                img.alt = 'QR Code Dokumen';
+                img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;`;
+                el.replaceWith(img);
+            });
+        }
+    }
+
+    doc.querySelectorAll('[data-page-spacer]').forEach((el) => {
+        if (forPrint) {
+            const pageBreak = doc.createElement('div');
+            pageBreak.setAttribute('data-page-break', 'true');
+            pageBreak.style.cssText = 'height:0;margin:0;padding:0;border:0;' +
+                'break-after:page;page-break-after:always;';
+            el.replaceWith(pageBreak);
+        } else {
+            el.remove();
+        }
+    });
     const gapBandHeight = Math.max(2, Math.min(24, Math.round(gap * 0.3)));
     const remaining = gap - gapBandHeight;
     const beforeHeight = gap > 0 ? Math.round(remaining * (margin.bottom / gap)) : 0;
@@ -734,6 +775,50 @@ function buildSignaturePopup(editor, close) {
     fetch('/signatures/users', {
         headers: { 'Accept': 'application/json' }
     })
+        .then(res => res.json())
+        .then(data => {
+            loading.style.display = 'none';
+            listContainer.style.display = 'flex';
+            const users = data.users || [];
+
+            users.forEach(u => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.style.cssText = 'display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 10px; border:none; background:transparent; border-radius:4px; text-align:left; cursor:pointer; font-size:13px; color:#1f2937; transition:background 0.15s;';
+                btn.onmouseover = () => btn.style.background = '#f3f4f6';
+                btn.onmouseout = () => btn.style.background = 'transparent';
+
+                const left = document.createElement('div');
+                left.style.cssText = 'display:flex; flex-direction:column;';
+                const name = document.createElement('span');
+                name.style.cssText = 'font-weight:500;';
+                name.textContent = u.is_me ? `✨ TTD Saya (${u.name})` : u.name;
+
+                const role = document.createElement('span');
+                role.style.cssText = 'font-size:11px; color:#6b7280;';
+                role.textContent = `${u.role} - ${u.division}`;
+
+                left.appendChild(name);
+                left.appendChild(role);
+
+                const badge = document.createElement('span');
+                badge.style.cssText = 'font-size:11px; font-family:monospace; background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:600;';
+                badge.textContent = u.placeholder;
+
+                btn.appendChild(left);
+                btn.appendChild(badge);
+
+                btn.addEventListener('click', () => {
+                    editor.selection.insertHTML(` ${u.placeholder} `);
+                    if (typeof close === 'function') close();
+                });
+
+                listContainer.appendChild(btn);
+            });
+        })
+        .catch(err => {
+            loading.textContent = 'Gagal memuat daftar pengguna.';
+            loading.style.color = '#ef4444';
     .then(res => res.json())
     .then(data => {
         loading.style.display = 'none';
@@ -802,11 +887,6 @@ function buildSignaturePopup(editor, close) {
             emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
             listContainer.style.display = visibleCount === 0 ? 'none' : 'flex';
         });
-    })
-    .catch(err => {
-        loading.textContent = 'Gagal memuat daftar pengguna.';
-        loading.style.color = '#ef4444';
-    });
 
     return wrapper;
 }
@@ -1053,7 +1133,7 @@ export function initJoditEditor(selector, overrides = {}) {
     // ─────────────────────────────────────────────────────────────────────
 
     const editor = Jodit.make(ta, {
-        height: 'auto',
+        height: '40vh',
         width: '100%',
         language: 'id',
         toolbarButtonSize: 'middle',
@@ -1077,6 +1157,7 @@ export function initJoditEditor(selector, overrides = {}) {
             'ul', 'ol', 'indent', 'outdent', '|',
             'font', 'fontsize', 'brush', 'paragraph', 'lineHeight', '|',
             'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', 'signature', '|',
+            // 'image', 'video', 'file', 'table', 'link', 'hr', 'qrCode', '|',
             'align', '|',
             'paperSize', 'margin', '|',
             'undo', 'redo', 'eraser', 'copyformat', '|',

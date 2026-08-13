@@ -1,4 +1,15 @@
 <x-app-layout>
+@push('after-styles')
+<style>
+    /* Let Jodit workplace fit the screen height flexibly */
+    #jodit-merge-box .jodit-workplace {
+        flex: 1 1 auto !important;
+        overflow-y: auto !important;
+        height: auto !important;
+        max-height: none !important;
+    }
+</style>
+@endpush
     @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
         <x-confirm-modal
             name="confirm-discard-{{ $document->id }}"
@@ -15,11 +26,11 @@
         $hasDraftOnly = !$pending && !$document->currentVersion;
     @endphp
 
-    <div class="min-h-screen bg-base-200/50">
+    <div class="h-full overflow-hidden bg-base-200/50 flex flex-col">
 
         {{-- Canvas / Dokumen --}}
-        <div class="py-10 px-2 sm:px-4">
-            <div class="max-w-6xl mx-auto">
+        <div class="flex-1 flex flex-col min-h-0 py-4 px-2 sm:px-4">
+            <div class="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0">
 
                 @if(session('success'))
                     <div class="mb-4">
@@ -97,15 +108,15 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form">
+                <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form" class="flex flex-col flex-1 min-h-0">
                     @csrf
                     @method('PUT')
 
                     {{-- Kotak gabungan: title bar + toolbar + editor Jodit jadi satu kotak --}}
-                    <div id="jodit-merge-box" class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
+                    <div id="jodit-merge-box" class="bg-base-100 rounded-xl shadow-md border border-base-300 flex flex-col flex-1 min-h-0">
 
-                        {{-- Title/Action row (tanpa border/radius sendiri — menyatu lewat overflow-hidden induk) --}}
-                        <div class="bg-base-100 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+                        {{-- Title/Action row --}}
+                        <div class="bg-base-100 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 rounded-t-xl">
 
                             <div class="flex items-center gap-3 min-w-0">
                                 <svg class="w-6 h-6 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -182,14 +193,7 @@
                     </form>
                 @endif
 
-                {{-- Live preview (tanpa tab kedua) --}}
-                <div class="mt-10">
-                    <div class="bg-base-100 rounded-xl shadow-md border border-base-300 p-4 sm:p-8">
-                        <div id="live-preview-content" class="prose max-w-none" style="overflow-wrap:break-word; word-break:break-word;">
-                            {!! $document->displayVersion()->content ?? '' !!}
-                        </div>
-                    </div>
-                </div>
+                {{-- Live preview removed --}}
             </div>
         </div>
     </div>
@@ -218,31 +222,34 @@
             border-radius: 0 !important;
             box-shadow: none !important;
             margin: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
         }
 
         /* jodit-toolbar_box (pembungkus toolbar) juga bisa punya radius/margin
            sendiri di sudut atasnya — dimatikan juga supaya benar-benar rata
-           menyambung ke title row di atasnya tanpa celah/sudut membulat. */
+           menyambung ke title row di atasnya tanpa celah/sudut membulat.
+           Juga ditambahkan position sticky agar toolbar tetap di layar
+           saat pengguna scroll ke bawah di dalam kontainer. */
+        #jodit-merge-box .jodit-toolbar__box,
         #jodit-merge-box .jodit-toolbar_box {
             border-radius: 0 !important;
             margin: 0 !important;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+            background: #fff; /* Pastikan background putih pekat tidak transparan */
         }
+        
+        /* Pastikan tidak ada elemen dalam Jodit yang menyembunyikan overflow
+           sehingga CSS position: sticky bisa tembus dan mendeteksi scroll layar */
+
     </style>
 
     <script>
         (function () {
-            const editor = window.__joditInstances?.get('jodit-editor');
-            const target = document.getElementById('live-preview-content');
-            if (editor && target) {
-                function render() {
-                    const html = editor.value;
-                    if (html && html.trim().length) {
-                        target.innerHTML = '<div class="prose max-w-none">' + html + '</div>';
-                    }
-                }
-                editor.events.on('change', render);
-            }
-
             // Isi hidden input draft-form dengan konten editor saat submit
             const draftForm = document.getElementById('draft-form');
             if (draftForm) {

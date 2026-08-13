@@ -4,11 +4,11 @@
 @endphp
 
 <x-app-layout>
-    <div class="min-h-screen bg-base-200/50">
+    <div class="h-full overflow-hidden bg-base-200/50 flex flex-col">
 
         {{-- Canvas / Dokumen --}}
-        <div class="py-10 px-2 sm:px-4">
-            <div class="max-w-6xl mx-auto">
+        <div class="flex-1 flex flex-col min-h-0 py-4 px-2 sm:px-4">
+            <div class="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0">
 
                 @if($errors->any())
                     <div class="mb-4">
@@ -18,25 +18,17 @@
                     </div>
                 @endif
 
-                    <button type="button" onclick="document.getElementById('discard-modal').showModal()" class="btn btn-ghost btn-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        {{ __('Batal') }}
-                    </button>
-                <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form">
+                <form method="POST" action="{{ route('documents.save', $document) }}" id="editor-form" class="flex flex-col flex-1 min-h-0">
                     @csrf
                     @method('PUT')
 
                     {{-- Kotak gabungan: title bar + toolbar + editor Jodit jadi satu kotak --}}
-                    <div id="jodit-merge-box" class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
+                    <div id="jodit-merge-box" class="bg-base-100 rounded-xl shadow-md border border-base-300 flex flex-col flex-1 min-h-0">
 
-                        {{-- Title/Action row (tanpa border/radius/sticky sendiri — menyatu lewat overflow-hidden induk) --}}
-                        <div class="bg-base-100 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+                        {{-- Title/Action row --}}
+                        <div class="bg-base-100 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 rounded-t-xl">
 
                             <div class="flex items-center gap-3 min-w-0">
-                                <svg class="w-6 h-6 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
                                 <h1 class="text-base sm:text-lg font-semibold truncate min-w-0">{{ $document->title }}</h1>
                                 <span class="badge badge-ghost badge-sm hidden sm:inline-flex">
                                     {{ $document->document_number ?? '' }}
@@ -48,11 +40,6 @@
 
                             <div class="flex flex-wrap items-center gap-2 shrink-0">
                                 <div class="hidden md:flex items-center gap-2 pr-3 mr-1 border-r border-base-300">
-                                    <div class="avatar placeholder">
-                                        <div class="bg-neutral text-neutral-content rounded-full w-8">
-                                            <span class="text-xs">{{ substr(auth()->user()->name, 0, 1) }}</span>
-                                        </div>
-                                    </div>
                                     <span class="text-sm font-medium">{{ auth()->user()->name }}</span>
                                 </div>
 
@@ -68,16 +55,9 @@
                             </div>
                         </div>
 
-                        {{-- Jodit Editor (toolbar akan muncul langsung menyambung di bawah title row di atas) --}}
-                <div>
-                    <div class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
-                        {{-- FIX MARGIN HILANG SAAT EDIT: textarea sekarang
-                             membawa ukuran kertas & margin yang tersimpan di
-                             dokumen (data-paper-size / data-paper-margin).
-                             initJoditEditor() (resources/js/jodit.js) baca
-                             dataset ini saat init, jadi editor mulai dari
-                             margin yang sama seperti di halaman preview —
-                             bukan selalu balik ke A4 + margin default. --}}
+                        {{-- Jodit Editor: textarea langsung jadi child #jodit-merge-box,
+                             TANPA wrapper div tambahan — mengikuti pola yang sudah
+                             terbukti bekerja di edit.blade.php (card-merge page). --}}
                         <textarea
                             name="content"
                             id="jodit-editor"
@@ -90,8 +70,7 @@
                         >{{ $document->displayVersion()->content ?? '' }}</textarea>
                     </div>
 
-                    {{-- Pengaturan kertas: diisi JS dari editor sebelum submit,
-                         biar pilihan ukuran kertas & margin ikut tersimpan. --}}
+                    {{-- Pengaturan kertas: diisi JS dari editor sebelum submit --}}
                     <input type="hidden" name="paper_size" id="paper-size-input" value="{{ $document->paper_size ?? 'A4' }}">
                     <input type="hidden" name="paper_margin" id="paper-margin-input" value="{{ $document->paper_margin ? json_encode($document->paper_margin) : '' }}">
 
@@ -190,10 +169,27 @@
 
         /* jodit-toolbar_box (pembungkus toolbar) juga bisa punya radius/margin
            sendiri di sudut atasnya — dimatikan juga supaya benar-benar rata
-           menyambung ke title row di atasnya tanpa celah/sudut membulat. */
+           menyambung ke title row di atasnya tanpa celah/sudut membulat.
+           Juga ditambahkan position sticky agar toolbar tetap di layar
+           saat pengguna scroll ke bawah di dalam kontainer. */
+        #jodit-merge-box .jodit-toolbar__box,
         #jodit-merge-box .jodit-toolbar_box {
             border-radius: 0 !important;
             margin: 0 !important;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+            background: #fff; /* Pastikan background putih pekat tidak transparan */
+        }
+
+        /* Biarkan Jodit workplace (area teks yang bisa diketik) yang
+           menyesuaikan tinggi layar secara fleksibel dan scroll di
+           dalam dirinya sendiri — bukan konten yang terpotong. */
+        #jodit-merge-box .jodit-workplace {
+            flex: 1 1 auto !important;
+            overflow-y: auto !important;
+            height: auto !important;
+            max-height: none !important;
         }
     </style>
 </x-app-layout>
