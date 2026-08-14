@@ -17,6 +17,7 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @stack('styles')
+        @stack('after-styles')
     </head>
     <body class="font-sans antialiased bg-base-200 text-base-content">
         <div class="flex h-screen overflow-hidden"

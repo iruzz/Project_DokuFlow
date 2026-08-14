@@ -1,15 +1,5 @@
 <x-app-layout>
-@push('after-styles')
-<style>
-    /* Let Jodit workplace fit the screen height flexibly */
-    #jodit-merge-box .jodit-workplace {
-        flex: 1 1 auto !important;
-        overflow-y: auto !important;
-        height: auto !important;
-        max-height: none !important;
-    }
-</style>
-@endpush
+
     @if(!auth()->user()->isAdmin() && !auth()->user()->isHead())
         <x-confirm-modal
             name="confirm-discard-{{ $document->id }}"
@@ -199,24 +189,8 @@
     </div>
 
     <style>
-        /* Jodit membungkus dirinya sendiri dalam .jodit-container yang punya
-           border/border-radius/box-shadow bawaan (dari jodit.min.css),
-           independen dari div pembungkus kita (#jodit-merge-box). Itu sebabnya
-           walau textarea sudah satu div dengan title row, Jodit tetap
-           menggambar kotaknya sendiri di dalamnya → kelihatan dua kotak
-           terpisah (border/shadow ganda). Override ini di-scope KHUSUS ke
-           #jodit-merge-box (tidak global) supaya instance Jodit lain di
-           halaman lain tidak ikut terdampak. */
-        /* Jodit membungkus toolbar+editor dalam .jodit-container yang punya
-           border/border-radius/box-shadow/margin bawaan sendiri (dari
-           jodit.min.css) — itulah kotak terpisah dengan sudut membulat &
-           shadow yang masih kelihatan. Override ini menghapus SEMUA styling
-           luar itu supaya .jodit-container rata/flat dan menyatu sempurna
-           dengan #jodit-merge-box (parent). Sudut membulat yang tersisa di
-           kotak gabungan sepenuhnya berasal dari overflow-hidden + rounded-xl
-           milik #jodit-merge-box, bukan dari Jodit. Di-scope ke
-           #jodit-merge-box saja (bukan global) supaya instance Jodit lain di
-           halaman lain tidak terdampak. */
+        /* ── Jodit container: hapus border/shadow/radius bawaan, jadikan flex
+           child yang mengisi sisa ruang #jodit-merge-box. ── */
         #jodit-merge-box .jodit-container {
             border: none !important;
             border-radius: 0 !important;
@@ -228,24 +202,32 @@
             min-height: 0 !important;
         }
 
-        /* jodit-toolbar_box (pembungkus toolbar) juga bisa punya radius/margin
-           sendiri di sudut atasnya — dimatikan juga supaya benar-benar rata
-           menyambung ke title row di atasnya tanpa celah/sudut membulat.
-           Juga ditambahkan position sticky agar toolbar tetap di layar
-           saat pengguna scroll ke bawah di dalam kontainer. */
+        /* ── Toolbar: rata tanpa radius, TIDAK BOLEH menyusut. ── */
         #jodit-merge-box .jodit-toolbar__box,
         #jodit-merge-box .jodit-toolbar_box {
             border-radius: 0 !important;
             margin: 0 !important;
-            position: sticky !important;
-            top: 0 !important;
+            flex-shrink: 0 !important;        /* kunci: toolbar tidak boleh collapse */
             z-index: 20 !important;
-            background: #fff; /* Pastikan background putih pekat tidak transparan */
         }
-        
-        /* Pastikan tidak ada elemen dalam Jodit yang menyembunyikan overflow
-           sehingga CSS position: sticky bisa tembus dan mendeteksi scroll layar */
 
+        /* ── Workplace: flex-grow mengisi sisa, tapi TIDAK scroll sendiri.
+           Scroll terjadi di dalam <iframe> (lihat rule berikutnya). ── */
+        #jodit-merge-box .jodit-workplace {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            overflow: hidden !important;       /* workplace sendiri tidak scroll */
+        }
+
+        /* ── KUNCI UTAMA: paksa <iframe> editor tinggi 100% dari workplace,
+           bukan auto-grow mengikuti dokumen. Scroll terjadi di DALAM iframe
+           (browser otomatis scroll isi iframe kalau kontennya lebih tinggi
+           dari frame-nya). ── */
+        #jodit-merge-box .jodit-workplace iframe {
+            height: 100% !important;
+            min-height: 0 !important;
+            max-height: none !important;
+        }
     </style>
 
     <script>
