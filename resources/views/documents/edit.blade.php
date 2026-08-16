@@ -183,31 +183,11 @@
                     </form>
                 @endif
 
-                {{-- Live preview: merender ulang konten editor secara real-time
-                     dengan pipeline yang SAMA PERSIS dengan show.blade.php dan
-                     preview.blade.php — .doku-paper-scope > .doku-paper —
-                     sehingga tampilan di sini adalah WYSIWYG sejati terhadap
-                     yang akan dilihat user di halaman preview/show. --}}
+                {{-- Live preview (tanpa tab kedua) --}}
                 <div class="mt-10">
-                    <div class="bg-base-100 rounded-xl shadow-md border border-base-300 overflow-hidden">
-                        <div class="px-4 py-2 bg-base-200 border-b border-base-300 text-xs text-base-content/50 font-medium tracking-wide uppercase">
-                            Preview
-                        </div>
-                        <div class="p-4">
-                            <div id="live-preview-content">
-                                {{-- Render awal: tampilkan konten yang tersimpan di DB dengan
-                                     _paper partial — konsisten dengan show.blade.php. --}}
-                                @php $display = $document->displayVersion(); @endphp
-                                @if($display && $display->content)
-                                    @include('documents._paper', [
-                                        'content'     => $display->content,
-                                        'document'    => $document,
-                                        'liveStorage' => 'doc-preview-' . $document->id,
-                                        'paperSize'   => $document->paper_size ?? 'A4',
-                                        'paperMargin' => $document->paper_margin,
-                                    ])
-                                @endif
-                            </div>
+                    <div class="bg-base-100 rounded-xl shadow-md border border-base-300 p-4 sm:p-8">
+                        <div id="live-preview-content" class="prose max-w-none" style="overflow-wrap:break-word; word-break:break-word;">
+                            {!! $document->displayVersion()->content ?? '' !!}
                         </div>
                     </div>
                 </div>
@@ -259,46 +239,17 @@
 
     <script>
         (function () {
+            const editor = window.__joditInstances?.get('jodit-editor');
             const target = document.getElementById('live-preview-content');
-            const storageKey = 'doc-preview-{{ $document->id }}';
-
-            // Bungkus HTML konten editor ke dalam struktur .doku-paper-scope >
-            // .doku-paper — SAMA PERSIS dengan yang dipakai preview.blade.php
-            // untuk live-sync. Ini yang memastikan CSS dari _paper.blade.php
-            // (dan document-shared.css .doku-paper scope) berlaku pada preview
-            // di halaman edit, sehingga hasil yang dilihat di sini identik
-            // dengan halaman preview/show sesungguhnya.
-            function renderPaper(html) {
-                if (!html || !html.trim().length) return;
-
-                const scope = document.createElement('div');
-                scope.className = 'doku-paper-scope';
-                scope.dataset.liveStorage = storageKey;
-                scope.dataset.paperSize = '{{ $document->paper_size ?? "A4" }}';
-                scope.dataset.paperMargin = '{{ json_encode($document->paper_margin) }}';
-
-                const paper = document.createElement('div');
-                paper.className = 'doku-paper';
-                paper.innerHTML = html;
-
-                scope.appendChild(paper);
-                target.innerHTML = '';
-                target.appendChild(scope);
-
-                // Terapkan batas antar halaman sesuai ukuran kertas aktif
-                // (dibaca dari localStorage, di-set oleh applyPaperSize di jodit.js).
-                if (window.__initPreviewPagination) {
-                    window.__initPreviewPagination(scope);
+            if (editor && target) {
+                function render() {
+                    const html = editor.value;
+                    if (html && html.trim().length) {
+                        target.innerHTML = '<div class="prose max-w-none">' + html + '</div>';
+                    }
                 }
+                editor.events.on('change', render);
             }
-
-            // Dengarkan perubahan dari editor (Jodit menulis ke localStorage
-            // setiap 250ms saat ada perubahan — lihat event 'change' di jodit.js).
-            window.addEventListener('storage', (e) => {
-                if (e.key === storageKey && e.newValue && e.newValue.trim().length) {
-                    renderPaper(e.newValue);
-                }
-            });
 
             // Isi hidden input draft-form dengan konten editor saat submit
             const draftForm = document.getElementById('draft-form');

@@ -89,13 +89,23 @@
                                         <td class="text-right">
                                             @if($req->isPending())
                                                 <div class="flex items-center justify-end gap-2">
-                                                    <form method="POST" action="{{ route('signatures.requests.approve', $req) }}">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-success btn-xs gap-1">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                                            Setujui
+                                                    @if(!$req->document || $req->is_viewed)
+                                                        <form method="POST" action="{{ route('signatures.requests.approve', $req) }}">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-success btn-xs gap-1">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                                                Setujui
+                                                            </button>
+                                                        </form>
+                                                    @else
+                                                        <button type="button" onclick="openPreviewModal({{ $req->id }}, '{{ route('documents.preview', $req->document_id) }}')" class="btn btn-primary btn-xs gap-1">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                            Pratinjau & Setujui
                                                         </button>
-                                                    </form>
+                                                        <form id="approve-form-{{ $req->id }}" method="POST" action="{{ route('signatures.requests.approve', $req) }}" class="hidden">
+                                                            @csrf
+                                                        </form>
+                                                    @endif
 
                                                     <button type="button" onclick="document.getElementById('reject-modal-{{ $req->id }}').showModal()" class="btn btn-error btn-outline btn-xs gap-1">
                                                         Tolak
@@ -216,5 +226,65 @@
                 @endif
             </div>
         </div>
-    </div>
+    <dialog id="document-preview-modal" class="modal">
+        <div class="modal-box w-11/12 max-w-5xl h-[90vh] flex flex-col p-0">
+            <div class="p-4 border-b border-base-300 flex justify-between items-center bg-base-200/50">
+                <h3 class="font-bold text-lg">Pratinjau Dokumen</h3>
+                <form method="dialog">
+                    <button class="btn btn-sm btn-circle btn-ghost">✕</button>
+                </form>
+            </div>
+            <div class="flex-grow relative bg-base-300/20">
+                <iframe id="document-preview-iframe" class="w-full h-full border-none" src=""></iframe>
+                <div id="preview-loading" class="absolute inset-0 flex items-center justify-center bg-base-100/50">
+                    <span class="loading loading-spinner loading-lg text-primary"></span>
+                </div>
+            </div>
+            <div class="p-4 border-t border-base-300 flex justify-between items-center bg-base-200/50">
+                <p class="text-sm text-base-content/70">Pastikan Anda telah membaca seluruh isi dokumen sebelum menyetujui.</p>
+                <div class="flex gap-2">
+                    <form method="dialog">
+                        <button class="btn btn-ghost">Batal</button>
+                    </form>
+                    <button id="btn-approve" class="btn btn-primary" onclick="submitApprove()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                        Setuju & TTD
+                    </button>
+                </div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <script>
+        let currentReqId = null;
+
+        function openPreviewModal(reqId, previewUrl) {
+            currentReqId = reqId;
+            
+            const iframe = document.getElementById('document-preview-iframe');
+            const loading = document.getElementById('preview-loading');
+            
+            loading.classList.remove('hidden');
+            iframe.src = previewUrl;
+            
+            iframe.onload = function() {
+                loading.classList.add('hidden');
+            };
+
+            document.getElementById('document-preview-modal').showModal();
+        }
+
+        function submitApprove() {
+            if (!currentReqId) return;
+
+            const btn = document.getElementById('btn-approve');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Memproses...';
+
+            document.getElementById('approve-form-' + currentReqId).submit();
+        }
+    </script>
 </x-app-layout>

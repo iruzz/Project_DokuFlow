@@ -557,23 +557,20 @@ class PdfExportService
                     margin: {$topIn}in {$rightIn}in {$bottomIn}in {$leftIn}in;
                 }
                 html, body { margin: 0; padding: 0; }
-                /* line-height:1.5 — SAMA PERSIS dengan .doku-content di
-                   document-shared.css yang dipakai editor (iframe body) dan
-                   print (buildPrintStyle). Sebelumnya "normal" (~1.2) yang
-                   membuat tinggi baris PDF berbeda dari editor sehingga
-                   elemen melompat halaman berbeda. */
-                body { font-family: 'Times New Roman', Times, serif; font-weight: normal; font-size: 16px; line-height: 1.5; color: #111; overflow-wrap: break-word; word-break: break-word; orphans: 1; widows: 1; }
+                /* WYSIWYG fix: base typography identical to buildIframeStyle() in jodit.js
+                   and .doku-paper in _paper.blade.php — color changed #111 → #000. */
+                body { font-family: 'Times New Roman', Times, serif; font-weight: normal; font-size: 16px; line-height: normal; color: #000; overflow-wrap: break-word; word-break: break-word; orphans: 1; widows: 1; }
                 .paper {
                     width: {$contentWidth}px;
                     box-sizing: content-box;
                 }
                 table { width: 100%; border: none; border-collapse: collapse; empty-cells: show; max-width: 100%; }
-                /* vertical-align:top — SAMA dengan .doku-content td/th di
-                   document-shared.css (via !important) dan .doku-paper-scope
-                   .doku-paper td/th di _paper.blade.php, supaya sel tabel
-                   di PDF juga rata atas, konsisten dengan editor & preview. */
+                /* WYSIWYG fix: vertical-align:top matches editor (th, td { vertical-align:top !important })
+                   and preview (.doku-paper th/td { vertical-align: top }) — was missing in export. */
                 table th, table td { border: 1px solid #ccc; padding: 2px 5px; vertical-align: top; }
                 img { max-width: 100%; height: auto; }
+                /* WYSIWYG fix: extend word-break to all content elements (matches buildIframeStyle). */
+                p, div, td, th, li, h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; word-break: break-word; }
             </style>
         </head>
         <body>

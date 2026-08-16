@@ -93,10 +93,14 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
     const padding = `${margin.top}px ${margin.right}px ${margin.bottom}px ${margin.left}px`;
     return [
         `@import url('${GOOGLE_FONTS_URL}');`,
-        `@import url('/css/document-shared.css');`,
         'html { margin:0; padding:0; background:#e5e7eb; }',
         'body {',
         '  box-sizing:border-box;',
+        // WYSIWYG fix: declare base typography explicitly so editor matches preview/print
+        '  font-family:"Times New Roman",Times,serif;',
+        '  font-size:16px;',
+        '  line-height:normal;',
+        '  color:#000;',
         `  width:${size.width}px;`,
         '  margin:0 auto;',
         `  padding:${padding};`,
@@ -105,7 +109,9 @@ function buildIframeStyle(size, margin = DEFAULT_MARGIN) {
         '  box-shadow:0 1px 3px rgba(0,0,0,0.1);',
         '}',
         'table { width:100%; border:none; border-collapse:collapse; empty-cells:show; max-width:100%; }',
+        // vertical-align:top matches .doku-paper th/td and PDF export rule
         'th, td { padding:2px 5px; border:1px solid #ccc; vertical-align:top !important; }',
+        // Apply word-break to all content elements, not just the container
         'body, p, div, td, th, li, h1, h2, h3, h4, h5, h6 { overflow-wrap:break-word; word-break:break-word; }',
     ].join('\n');
 }
@@ -953,10 +959,17 @@ function buildPrintStyle(win, size, margin) {
     const mRightIn = (margin.right / 96).toFixed(4);
     const mBottomIn = (margin.bottom / 96).toFixed(4);
     const mLeftIn = (margin.left / 96).toFixed(4);
+
+    // WYSIWYG fix: load Google Fonts into print iframe so user-chosen fonts
+    // (Roboto, Open Sans, etc.) actually render instead of falling back to the
+    // generic family. @import MUST be the very first rule in its <style> block,
+    // so we inject it as a separate <style> element before the main one.
+    const fontStyle = win.document.createElement('style');
+    fontStyle.textContent = `@import url('${GOOGLE_FONTS_URL}');`;
+    win.document.head.appendChild(fontStyle);
+
     const style = win.document.createElement('style');
     style.innerHTML = `
-        @import url('${GOOGLE_FONTS_URL}');
-        @import url('/css/document-shared.css');
         @page {
             size: ${widthIn}in ${heightIn}in;
             /* Margin WAJIB lewat @page, bukan padding body — @page margin
@@ -971,6 +984,12 @@ function buildPrintStyle(win, size, margin) {
             body {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+                /* WYSIWYG fix: declare same base typography as buildIframeStyle()
+                   so print output matches the editor and the preview page. */
+                font-family: "Times New Roman", Times, serif;
+                font-size: 16px;
+                line-height: normal;
+                color: #000;
                 box-shadow: none !important;
                 /* Body tidak boleh punya padding/width sendiri saat print —
                    area konten sudah otomatis dikurangi margin oleh @page. */
@@ -978,6 +997,25 @@ function buildPrintStyle(win, size, margin) {
                 min-height: 0 !important;
                 padding: 0 !important;
                 margin: 0 !important;
+            }
+            /* WYSIWYG fix: table cell alignment must match editor (top) and
+               preview page (.doku-paper th/td { vertical-align: top }) so
+               multi-row cells look the same across all three contexts. */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                empty-cells: show;
+            }
+            table th, table td {
+                border: 1px solid #ccc;
+                padding: 2px 5px;
+                vertical-align: top;
+            }
+            /* WYSIWYG fix: extend word-break to all content elements, not just
+               body, so long URLs/strings inside nested li/heading don't overflow. */
+            p, div, td, th, li, h1, h2, h3, h4, h5, h6 {
+                overflow-wrap: break-word;
+                word-break: break-word;
             }
             /* FIX UTAMA: jangan paksa titik potong dari spacer editor.
                Biarkan browser menghitung native page-break sendiri
@@ -1039,8 +1077,8 @@ function doPrint(jodit, size) {
     jodit.e.fire('generateDocumentStructure.iframe', myWindow.document, jodit);
     // getCleanValue(jodit, true): buang spacer DAN ganti placeholder QR jadi
     // <img> asli. Tidak ada titik potong halaman yang dipaksakan — browser
+    // yang menghitung sendiri.
     myWindow.document.body.innerHTML = getCleanValue(jodit, true);
-    myWindow.document.body.classList.add('doku-content');
 
     const margin = jodit.currentMargin || DEFAULT_MARGIN;
     buildPrintStyle(myWindow, size, margin);
@@ -1397,9 +1435,6 @@ export function initJoditEditor(selector, overrides = {}) {
     // supaya editor benar-benar mulai dari margin yang sudah tersimpan.
     applyPaperSize(editor, initialSize, initialMargin);
     editor.e.on('afterInit', () => {
-        if (editor.editor) {
-            editor.editor.classList.add('doku-content');
-        }
         applyPaperSize(editor, initialSize, initialMargin);
         repaginateEditor(editor);
 

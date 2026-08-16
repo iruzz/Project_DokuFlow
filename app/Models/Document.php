@@ -120,6 +120,11 @@ class Document extends Model
         return $this->hasMany(DocumentVersion::class);
     }
 
+    public function signatureRequests(): HasMany
+    {
+        return $this->hasMany(SignatureRequest::class);
+    }
+
     public function accessLinks(): HasMany
     {
         return $this->hasMany(DocumentAccessLink::class);

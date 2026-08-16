@@ -143,7 +143,9 @@ class SignatureController extends Controller
                     'has_signature' => $u->hasSignature(),
                     'placeholder' => $u->id === $currentUser->id ? '[ttd.me]' : '[ttd:' . $u->name . ']',
                 ];
-            });
+            })
+            ->sortByDesc('is_me')
+            ->values();
 
         return response()->json([
             'users' => $users,
@@ -180,6 +182,7 @@ class SignatureController extends Controller
         }
 
         $signatureRequest->update([
+            'is_viewed' => true,
             'status' => 'approved',
             'responded_at' => now(),
         ]);
@@ -204,4 +207,5 @@ class SignatureController extends Controller
 
         return back()->with('success', 'Permintaan tanda tangan telah ditolak.');
     }
+
 }

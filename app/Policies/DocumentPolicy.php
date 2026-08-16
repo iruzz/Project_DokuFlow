@@ -22,7 +22,12 @@ class DocumentPolicy
         }
 
         // Any share (personal, division, or link) grants view.
-        return app(DocumentShareService::class)->resolveEffectiveRole($document, $user) !== null;
+        if (app(DocumentShareService::class)->resolveEffectiveRole($document, $user) !== null) {
+            return true;
+        }
+
+        // A requested signer is allowed to view the document
+        return $document->signatureRequests()->where('target_user_id', $user->id)->exists();
     }
 
     public function create(User $user): bool

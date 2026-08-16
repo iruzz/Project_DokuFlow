@@ -15,6 +15,7 @@ class SignatureRequest extends Model
         'target_user_id',
         'document_id',
         'status',
+        'is_viewed',
         'rejected_reason',
         'requested_at',
         'responded_at',
@@ -25,6 +26,7 @@ class SignatureRequest extends Model
         return [
             'requested_at' => 'datetime',
             'responded_at' => 'datetime',
+            'is_viewed' => 'boolean',
         ];
     }
 
