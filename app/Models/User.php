@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'division_id', 'system_role', 'is_active'])]
+#[Fillable(['name', 'email', 'password', 'division_id', 'system_role', 'is_active', 'nik', 'phone_number', 'branch_id', 'position'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -32,6 +32,11 @@ class User extends Authenticatable
     public function division(): BelongsTo
     {
         return $this->belongsTo(Division::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     /**
@@ -109,6 +114,11 @@ class User extends Authenticatable
     public function isHead(): bool
     {
         return $this->system_role === 'head';
+    }
+
+    public function isDirector(): bool
+    {
+        return $this->system_role === 'director';
     }
 
     protected $with = ['signature'];
